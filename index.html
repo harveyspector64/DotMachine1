@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ChatGPT Ad Maker</title>
+  <title>DOT MACHINE!</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -27,9 +27,21 @@
     #dropZone.hover {
       border-color: #333;
     }
-    .slider-container {
-      margin: 20px auto;
+    .controls {
       max-width: 600px;
+      margin: 0 auto 20px;
+      text-align: left;
+    }
+    .control-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input[type=range] {
+      width: 100%;
+      touch-action: none; /* Prevents unwanted mobile pinch/zoom */
     }
     canvas {
       border: 1px solid #ccc;
@@ -38,35 +50,65 @@
       display: block;
       margin: 20px auto;
     }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      background: #333;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <h1>ChatGPT Ad Maker</h1>
+  <h1>DOT MACHINE!</h1>
   <div id="dropZone">Drag & Drop your image here or click to select.</div>
-  <!-- Hidden file input for clicking -->
+  <!-- Hidden file input -->
   <input type="file" id="fileInput" accept="image/*" style="display:none">
   
-  <div class="slider-container">
-    <label for="dotSize">Dot Size: </label>
-    <input type="range" id="dotSize" min="5" max="50" value="20">
-    <span id="dotSizeValue">20</span>
+  <div class="controls">
+    <div class="control-group">
+      <label for="gridSize">Grid Size (Dot Spacing): <span id="gridSizeValue">20</span></label>
+      <input type="range" id="gridSize" min="5" max="50" value="20">
+    </div>
+    <div class="control-group">
+      <label for="dotScale">Dot Scale (% of cell): <span id="dotScaleValue">50</span>%</label>
+      <input type="range" id="dotScale" min="10" max="100" value="50">
+    </div>
+    <div class="control-group">
+      <label for="dotColor">Dot Color:</label>
+      <input type="color" id="dotColor" value="#000000">
+    </div>
+    <div class="control-group">
+      <label for="bgColor">Background Color:</label>
+      <input type="color" id="bgColor" value="#ffffff">
+    </div>
+    <div class="control-group">
+      <button id="resetButton">Reset</button>
+      <button id="downloadButton">Download Image</button>
+    </div>
   </div>
   
   <canvas id="canvas"></canvas>
   
   <script>
-    // Reference DOM elements
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
-    const dotSizeSlider = document.getElementById('dotSize');
-    const dotSizeValue = document.getElementById('dotSizeValue');
+    const gridSizeSlider = document.getElementById('gridSize');
+    const gridSizeValue = document.getElementById('gridSizeValue');
+    const dotScaleSlider = document.getElementById('dotScale');
+    const dotScaleValue = document.getElementById('dotScaleValue');
+    const dotColorPicker = document.getElementById('dotColor');
+    const bgColorPicker = document.getElementById('bgColor');
+    const resetButton = document.getElementById('resetButton');
+    const downloadButton = document.getElementById('downloadButton');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-
-    // Store current image for re-rendering when slider changes
+  
     let currentImage = null;
-
-    // Helper: Load and render image
+  
+    // Loads the selected image and renders the halftone effect.
     function loadImage(file) {
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -75,17 +117,15 @@
           currentImage = img;
           canvas.width = img.width;
           canvas.height = img.height;
-          createHalftone(img, parseInt(dotSizeSlider.value, 10));
+          createHalftone();
         }
         img.src = e.target.result;
       }
       reader.readAsDataURL(file);
     }
-
-    // Drag & Drop events
-    dropZone.addEventListener('click', () => {
-      fileInput.click();
-    });
+  
+    // Drag & drop events for the drop zone.
+    dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('hover');
@@ -106,51 +146,77 @@
         loadImage(e.target.files[0]);
       }
     });
-
-    // Update dot size value on slider input and re-render halftone if an image is loaded
-    dotSizeSlider.addEventListener('input', () => {
-      dotSizeValue.textContent = dotSizeSlider.value;
-      if (currentImage) {
-        // Small delay to mimic spontaneity
-        setTimeout(() => {
-          createHalftone(currentImage, parseInt(dotSizeSlider.value, 10));
-        }, Math.random() * 200);
-      }
+  
+    // Update controls and re-render when values change.
+    gridSizeSlider.addEventListener('input', () => {
+      gridSizeValue.textContent = gridSizeSlider.value;
+      if (currentImage) createHalftone();
     });
-
-    // Create halftone effect from the image with adjustable dot size.
-    function createHalftone(image, dotSize) {
-      // Create an offscreen canvas to extract pixel data
-      const offCanvas = document.createElement('canvas');
-      offCanvas.width = image.width;
-      offCanvas.height = image.height;
-      const offCtx = offCanvas.getContext('2d');
-      offCtx.drawImage(image, 0, 0, image.width, image.height);
-      const imageData = offCtx.getImageData(0, 0, image.width, image.height).data;
-      
-      // Clear the main canvas and fill with white background
-      ctx.fillStyle = 'white';
+  
+    dotScaleSlider.addEventListener('input', () => {
+      dotScaleValue.textContent = dotScaleSlider.value;
+      if (currentImage) createHalftone();
+    });
+  
+    dotColorPicker.addEventListener('input', () => {
+      if (currentImage) createHalftone();
+    });
+  
+    bgColorPicker.addEventListener('input', () => {
+      if (currentImage) createHalftone();
+    });
+  
+    resetButton.addEventListener('click', () => {
+      currentImage = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+  
+    downloadButton.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'dot_machine.png';
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  
+    // Creates the halftone (dotted) effect.
+    function createHalftone() {
+      const gridSize = parseInt(gridSizeSlider.value, 10);
+      // Dot scale is a percentage (e.g., 50 means dots can grow up to 50% of the grid cell diameter).
+      const dotScale = parseInt(dotScaleSlider.value, 10) / 100;
+      const dotColor = dotColorPicker.value;
+      const bgColor = bgColorPicker.value;
+  
+      // Fill background.
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Process the image in a grid based on the dot size slider.
-      for (let y = 0; y < image.height; y += dotSize) {
-        for (let x = 0; x < image.width; x += dotSize) {
-          // Sample pixel at the center of the grid cell
-          const sampleX = Math.min(x + Math.floor(dotSize / 2), image.width - 1);
-          const sampleY = Math.min(y + Math.floor(dotSize / 2), image.height - 1);
-          const index = (sampleY * image.width + sampleX) * 4;
+  
+      // Create an offscreen canvas to extract pixel data.
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = currentImage.width;
+      offCanvas.height = currentImage.height;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(currentImage, 0, 0, currentImage.width, currentImage.height);
+      const imageData = offCtx.getImageData(0, 0, currentImage.width, currentImage.height).data;
+  
+      // Loop through the image in grid cells.
+      for (let y = 0; y < currentImage.height; y += gridSize) {
+        for (let x = 0; x < currentImage.width; x += gridSize) {
+          // Sample pixel at the center of the grid cell.
+          const sampleX = Math.min(x + Math.floor(gridSize / 2), currentImage.width - 1);
+          const sampleY = Math.min(y + Math.floor(gridSize / 2), currentImage.height - 1);
+          const index = (sampleY * currentImage.width + sampleX) * 4;
           const r = imageData[index];
           const g = imageData[index + 1];
           const b = imageData[index + 2];
-          // Convert RGB to grayscale brightness (0-255)
+          // Compute brightness and invert it so darker areas yield larger dots.
           const brightness = (r + g + b) / 3;
-          // Invert brightness so that darker areas yield larger dots.
           const norm = 1 - (brightness / 255);
-          // Maximum possible radius is half the dot cell size.
-          const radius = norm * (dotSize / 2);
+          // Maximum dot radius is a fraction of the grid cell size.
+          const maxRadius = (gridSize * dotScale) / 2;
+          const radius = norm * maxRadius;
           ctx.beginPath();
-          ctx.arc(x + dotSize / 2, y + dotSize / 2, radius, 0, Math.PI * 2);
-          ctx.fillStyle = 'black';
+          ctx.arc(x + gridSize / 2, y + gridSize / 2, radius, 0, Math.PI * 2);
+          ctx.fillStyle = dotColor;
           ctx.fill();
         }
       }
