@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ChatGPT Ad Maker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    #dropZone {
+      border: 2px dashed #aaa;
+      border-radius: 10px;
+      padding: 30px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+      max-width: 600px;
+      margin: 0 auto 20px;
+    }
+    #dropZone.hover {
+      border-color: #333;
+    }
+    .slider-container {
+      margin: 20px auto;
+      max-width: 600px;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 20px auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>ChatGPT Ad Maker</h1>
+  <div id="dropZone">Drag & Drop your image here or click to select.</div>
+  <!-- Hidden file input for clicking -->
+  <input type="file" id="fileInput" accept="image/*" style="display:none">
+  
+  <div class="slider-container">
+    <label for="dotSize">Dot Size: </label>
+    <input type="range" id="dotSize" min="5" max="50" value="20">
+    <span id="dotSizeValue">20</span>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+  
+  <script>
+    // Reference DOM elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const dotSizeSlider = document.getElementById('dotSize');
+    const dotSizeValue = document.getElementById('dotSizeValue');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Store current image for re-rendering when slider changes
+    let currentImage = null;
+
+    // Helper: Load and render image
+    function loadImage(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          currentImage = img;
+          canvas.width = img.width;
+          canvas.height = img.height;
+          createHalftone(img, parseInt(dotSizeSlider.value, 10));
+        }
+        img.src = e.target.result;
+      }
+      reader.readAsDataURL(file);
+    }
+
+    // Drag & Drop events
+    dropZone.addEventListener('click', () => {
+      fileInput.click();
+    });
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('hover');
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        loadImage(e.dataTransfer.files[0]);
+      }
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        loadImage(e.target.files[0]);
+      }
+    });
+
+    // Update dot size value on slider input and re-render halftone if an image is loaded
+    dotSizeSlider.addEventListener('input', () => {
+      dotSizeValue.textContent = dotSizeSlider.value;
+      if (currentImage) {
+        // Small delay to mimic spontaneity
+        setTimeout(() => {
+          createHalftone(currentImage, parseInt(dotSizeSlider.value, 10));
+        }, Math.random() * 200);
+      }
+    });
+
+    // Create halftone effect from the image with adjustable dot size.
+    function createHalftone(image, dotSize) {
+      // Create an offscreen canvas to extract pixel data
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = image.width;
+      offCanvas.height = image.height;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(image, 0, 0, image.width, image.height);
+      const imageData = offCtx.getImageData(0, 0, image.width, image.height).data;
+      
+      // Clear the main canvas and fill with white background
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Process the image in a grid based on the dot size slider.
+      for (let y = 0; y < image.height; y += dotSize) {
+        for (let x = 0; x < image.width; x += dotSize) {
+          // Sample pixel at the center of the grid cell
+          const sampleX = Math.min(x + Math.floor(dotSize / 2), image.width - 1);
+          const sampleY = Math.min(y + Math.floor(dotSize / 2), image.height - 1);
+          const index = (sampleY * image.width + sampleX) * 4;
+          const r = imageData[index];
+          const g = imageData[index + 1];
+          const b = imageData[index + 2];
+          // Convert RGB to grayscale brightness (0-255)
+          const brightness = (r + g + b) / 3;
+          // Invert brightness so that darker areas yield larger dots.
+          const norm = 1 - (brightness / 255);
+          // Maximum possible radius is half the dot cell size.
+          const radius = norm * (dotSize / 2);
+          ctx.beginPath();
+          ctx.arc(x + dotSize / 2, y + dotSize / 2, radius, 0, Math.PI * 2);
+          ctx.fillStyle = 'black';
+          ctx.fill();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
